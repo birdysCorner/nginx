@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>My Effective Lawn Bowls</title>
+
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+    }
+
+    .header-fields {
+        max-width: 600px;
+        margin-bottom: 30px;
+    }
+
+    label {
+        display: block;
+        margin-top: 10px;
+    }
+
+    input[type="text"], input[type="date"] {
+        width: 100%;
+        padding: 6px;
+        box-sizing: border-box;
+    }
+
+    button {
+        margin-right: 10px;
+        padding: 6px 12px;
+    }
+
+    table {
+        border-collapse: collapse;
+        width: 100%;
+        max-width: 600px;
+    }
+
+    th, td {
+        border: 1px solid #333;
+        padding: 8px;
+        text-align: center;
+    }
+
+    th {
+        background-color: #f2f2f2;
+    }
+
+    input[type="number"] {
+        width: 60px;
+    }
+
+    .invalid {
+        background-color: #fdd;
+    }
+
+    tfoot td {
+        font-weight: bold;
+    }
+</style>
+</head>
+
+<body>
+
+<button onclick="resetTable()">Clear / Reset</button>
+<button onclick="exportCSV()">Export to CSV</button>
+
+<h2>My Effective Bowls in Lawn Bowls</h2>
+
+<div class="header-fields">
+    <label>
+        Game Description
+        <input type="text" id="description">
+    </label>
+
+    <label>
+        Date
+        <input type="date" id="date">
+    </label>
+</div>
+
+<table id="bowlsTable">
+    <thead>
+        <tr>
+            <th>End Number</th>
+            <th>Effective (0–2)</th>
+            <th>Accumulated Effective</th>
+            <th>Percentage Effective</th>
+        </tr>
+    </thead>
+
+    <tbody></tbody>
+
+    <tfoot>
+        <tr>
+            <td>Totals / Average</td>
+            <td id="totalEffective">0</td>
+            <td id="totalAccumulated">0</td>
+            <td id="averagePercentage">0%</td>
+        </tr>
+    </tfoot>
+</table>
+
+<script>
+const tbody = document.querySelector("#bowlsTable tbody");
+
+// Create 21 rows
+for (let i = 1; i <= 21; i++) {
+    const row = document.createElement("tr");
+    row.innerHTML = `
+        <td>${i}</td>
+        <td><input type="number" min="0" max="2" step="1"></td>
+        <td class="accumulated">0</td>
+        <td class="percentage"></td>
+    `;
+    tbody.appendChild(row);
+}
+
+const rows = document.querySelectorAll("#bowlsTable tbody tr");
+rows.forEach(row =>
+    row.querySelector("input").addEventListener("input", updateTotals)
+);
+
+function updateTotals() {
+    let accumulated = 0;
+    let validEnds = 0;
+
+    rows.forEach(row => {
+        const input = row.querySelector("input");
+        const accCell = row.querySelector(".accumulated");
+        const pctCell = row.querySelector(".percentage");
+        const value = Number(input.value);
+
+        if (input.value === "" || value < 0 || value > 2) {
+            input.classList.add("invalid");
+            accCell.textContent = accumulated;
+            pctCell.textContent = "";
+            return;
+        }
+
+        input.classList.remove("invalid");
+        accumulated += value;
+        validEnds++;
+
+        accCell.textContent = accumulated;
+        pctCell.textContent =
+            ((accumulated / (validEnds * 2)) * 100).toFixed(1) + " %";
+    });
+
+    document.getElementById("totalEffective").textContent = accumulated;
+    document.getElementById("totalAccumulated").textContent = accumulated;
+
+    const avgPct =
+        validEnds > 0 ? (accumulated / (validEnds * 2)) * 100 : 0;
+
+    document.getElementById("averagePercentage").textContent =
+        avgPct.toFixed(1) + " %";
+}
+
+function resetTable() {
+    document.getElementById("description").value = "";
+    document.getElementById("date").value = "";
+
+    rows.forEach(row => {
+        const input = row.querySelector("input");
+        input.value = "";
+        input.classList.remove("invalid");
+        row.querySelector(".accumulated").textContent = "0";
+        row.querySelector(".percentage").textContent = "";
+    });
+
+    document.getElementById("totalEffective").textContent = "0";
+    document.getElementById("totalAccumulated").textContent = "0";
+    document.getElementById("averagePercentage").textContent = "0 %";
+}
+
+function exportCSV() {
+    const description = document.getElementById("description").value || "";
+    const date = document.getElementById("date").value || "";
+
+    // Filename: ELB instead of Effective Lawn Bowls
+    const safeDescription = description
+        .replace(/[^a-z0-9]/gi, "_")
+        .toLowerCase();
+
+    const filename =
+        `ELB_${safeDescription || "game"}_${date || "nodate"}.csv`;
+
+    let csv = "";
+    csv += "My Effective Lawn Bowls\n";
+    csv += `Game Description,${description}\n`;
+    csv += `Date,${date}\n`;
+    csv += "\n";
+    csv += "End,Effective,Accumulated,Percentage\n";
+
+    let lastAccumulated = 0;
+    let validEnds = 0;
+
+    rows.forEach(row => {
+        const end = row.cells[0].textContent;
+        const effValue = row.cells[1].querySelector("input").value;
+        const acc = row.cells[2].textContent;
+        const pctText = row.cells[3].textContent;
+
+        if (effValue !== "") {
+            validEnds++;
+            lastAccumulated = Number(acc);
+        }
+
+        // Convert percentage to numeric % (multiply by 100)
+        const pctNumber = pctText
+            ? parseFloat(pctText).toFixed(2)
+            : "";
+
+        csv += `${end},${effValue},${acc},${pctNumber}\n`;
+    });
+
+    const avgPct =
+        validEnds > 0 ? (lastAccumulated / (validEnds * 2)) * 100 : 0;
+
+    csv += "\n";
+    csv += `Totals,${lastAccumulated},${lastAccumulated},${avgPct.toFixed(2)}\n`;
+
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+
+    URL.revokeObjectURL(url);
+}
+</script>
+
+</body>
+</html>
+
+
